@@ -3,3 +3,8 @@ Revision history for Perl extension Astro::MoonPhase.
 0.10  Thu Jan 20 05:34:08 2000
 	- original version; created by h2xs 1.19
 
+0.11  Thu Oct 30 15:57:25 PST 2003
+        - fixed localtime bug in jtime()
+        - simplified jtime()
+	- fixed bug in phasehunt() where it would sometimes
+          return next new moon time from the wrong lunation

@@ -7,7 +7,7 @@ require Exporter;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(phase phasehunt);
-$VERSION = '0.10';
+$VERSION = '0.11';
 
 use Time::Local qw(timegm);
 
@@ -26,42 +26,43 @@ $Epoch					= 2444238.5;		# 1980 January 0.0
 
 $Elonge					= 278.833540;		# ecliptic longitude of the Sun at epoch 1980.0
 $Elongp					= 282.596403;		# ecliptic longitude of the Sun at perigee
-$Eccent					= 0.016718;			# eccentricity of Earth's orbit
+$Eccent					= 0.016718;		# eccentricity of Earth's orbit
 $Sunsmax				= 1.495985e8;		# semi-major axis of Earth's orbit, km
-$Sunangsiz				= 0.533128;			# sun's angular size, degrees, at semi-major axis distance
+$Sunangsiz				= 0.533128;		# sun's angular size, degrees, at semi-major axis distance
 
 # Elements of the Moon's orbit, epoch 1980.0.
 
-$Mmlong					= 64.975464;	# moon's mean longitude at the epoch
-$Mmlongp				= 349.383063;	# mean longitude of the perigee at the epoch
-$Mlnode					= 151.950429;	# mean longitude of the node at the epoch
+$Mmlong					= 64.975464;		# moon's mean longitude at the epoch
+$Mmlongp				= 349.383063;		# mean longitude of the perigee at the epoch
+$Mlnode					= 151.950429;		# mean longitude of the node at the epoch
 $Minc					= 5.145396;		# inclination of the Moon's orbit
 $Mecc					= 0.054900;		# eccentricity of the Moon's orbit
 $Mangsiz				= 0.5181;		# moon's angular size at distance a from Earth
 $Msmax					= 384401.0;		# semi-major axis of Moon's orbit in km
 $Mparallax				= 0.9507;		# parallax at distance a from Earth
-$Synmonth				= 29.53058868;	# synodic month (new Moon to new Moon)
+$Synmonth				= 29.53058868;		# synodic month (new Moon to new Moon)
 
 # Properties of the Earth.
 
-$Pi						= 3.14159265358979323846;	# assume not near black hole nor in Tennessee
+$Pi					= 3.14159265358979323846;	# assume not near black hole nor in Tennessee
 
 # Handy mathematical functions.
 
-sub sgn			{ return (($_[0] < 0) ? -1 : ($_[0] > 0 ? 1 : 0)); } 	# extract sign
+sub sgn		{ return (($_[0] < 0) ? -1 : ($_[0] > 0 ? 1 : 0)); } 	# extract sign
 sub fixangle	{ return ($_[0] - 360.0 * (floor($_[0] / 360.0))); }	# fix angle
-sub torad		{ return ($_[0] * ($Pi / 180.0)); }						# deg->rad
-sub todeg		{ return ($_[0] * (180.0 / $Pi)); }						# rad->deg
-sub dsin		{ return (sin(torad($_[0]))); }						# sin from deg
-sub dcos		{ return (cos(torad($_[0]))); }						# cos from deg
+sub torad	{ return ($_[0] * ($Pi / 180.0)); }						# deg->rad
+sub todeg	{ return ($_[0] * (180.0 / $Pi)); }						# rad->deg
+sub dsin	{ return (sin(torad($_[0]))); }						# sin from deg
+sub dcos	{ return (cos(torad($_[0]))); }						# cos from deg
 
-sub tan			{ return sin($_[0])/cos($_[0]); }
-sub asin		{ return ($_[0]<-1 or $_[0]>1) ? undef : atan2($_[0],sqrt(1-$_[0]*$_[0])); }
+sub tan		{ return sin($_[0])/cos($_[0]); }
+sub asin	{ return ($_[0]<-1 or $_[0]>1) ? undef : atan2($_[0],sqrt(1-$_[0]*$_[0])); }
 sub atan {
     if		($_[0]==0)	{ return 0; }
 	elsif	($_[0]>0)	{ return atan2(sqrt(1+$_[0]*$_[0]),sqrt(1+1/($_[0]*$_[0]))); }
 	else 				{ return -atan2(sqrt(1+$_[0]*$_[0]),sqrt(1+1/($_[0]*$_[0]))); }
 }
+
 sub floor {
   my $val   = shift;
   my $neg   = $val < 0;
@@ -71,36 +72,21 @@ sub floor {
   return ($exact ? $asint : $neg ? $asint - 1 : $asint);
 }
 
-# jdate - convert internal GMT date and time to Julian day and fraction
-sub jdate {
-	use integer;
-	my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = @_;
-	my ($c, $m, $y);
 
-	$y = $year + 1900;
-	$m = $mon + 1;
-	if ($m > 2) {
-		$m = $m - 3;
-	}
-	else {
-		$m = $m + 9;
-		$y--;
-	}
-	$c = $y / 100;		# compute century
-	$y -= 100 * $c;
-	return ($mday + ($c * 146097) / 4 + ($y * 1461) / 4 + ($m * 153 + 2) / 5 + 1721119);
-}
 
 # jtime - convert internal date and time to astronomical Julian
 # time (i.e. Julian date plus day fraction)
+
+
 sub jtime {
-	my $t = shift;
-	my @dt;
 
-	@dt = localtime($t);
+        my $t = shift;
+        my ($julian);
+        $julian = ($t / 86400) + 2440587.5;	# (seconds /(seconds per day)) + julian date of epoch
+        return ($julian);
 
-	return (( jdate(@dt) - 0.5 ) + ( $dt[0] + 60 * ( $dt[1] + 60 * $dt[2] ) ) / 86400.0 );
 }
+
 
 # jyear - convert Julian date to year, month, day, which are
 # returned via integer pointers to integers
@@ -287,26 +273,19 @@ sub truephase {
 # new moons which bound the current lunation
 sub phasehunt {
 	my $sdate = jtime(shift || time());
-	my ($adate, $k1, $k2, $nt1, $nt2);
+	my ($k1, $k2, $nt1, $nt2);
 
-	$adate = $sdate - 45;
-	$nt1 = meanphase($adate, 0.0, \$k1);
-	while (1) {
-		$adate += $Synmonth;
-		$nt2 = meanphase($adate, 0.0, \$k2);
-		if ($nt1 <= $sdate && $nt2 > $sdate) {
-			last;
-		}
-		$nt1 = $nt2;
-		$k1 = $k2;
-	}
-	return	(
-			jdaytosecs(truephase($k1, 0.0)),
-			jdaytosecs(truephase($k1, 0.25)),
-			jdaytosecs(truephase($k1, 0.5)),
-			jdaytosecs(truephase($k1, 0.75)),
-			jdaytosecs(truephase($k2, 0.0))
+	$nt1 = meanphase($sdate, 0.0, \$k1);
+
+	$k1++ if $nt1 < $sdate;
+	$k1-- if $nt1 > $sdate;
+
+	return  map { jdaytosecs(truephase( @$_ ) ) }
+			(
+			map( { [ $k1, $_ ]         } ( 0, 0.25, 0.5, 0.75 ) ),
+			map( { [ $k1 + 1, $_ ]     } ( 0 )                  )
 			);
+
 }
 
 # kepler - solve the equation of Kepler
@@ -342,7 +321,7 @@ sub phase {
 	my $dist;				# distance in kilometres
 	my $angdia;				# angular diameter in degrees
 	my $sudist;				# distance to Sun
-	my $suangdia;			# sun's angular diameter
+	my $suangdia;				# sun's angular diameter
 
 	my ($Day, $N, $M, $Ec, $Lambdasun, $ml, $MM, $MN, $Ev, $Ae, $A3, $MmP,
 	   $mEc, $A4, $lP, $V, $lPP, $NP, $y, $x, $Lambdamoon, $BetaM,
@@ -354,14 +333,14 @@ sub phase {
 	# Calculation of the Sun's position.
 
 	$Day = $pdate - $Epoch;						# date within epoch
-	$N = fixangle((360 / 365.2422) * $Day);	# mean anomaly of the Sun
-	$M = fixangle($N + $Elonge - $Elongp);		# convert from perigee
-												# co-ordinates to epoch 1980.0
+	$N = fixangle((360 / 365.2422) * $Day);				# mean anomaly of the Sun
+	$M = fixangle($N + $Elonge - $Elongp);				# convert from perigee
+									# co-ordinates to epoch 1980.0
 	$Ec = kepler($M, $Eccent);					# solve equation of Kepler
 	$Ec = sqrt((1 + $Eccent) / (1 - $Eccent)) * tan($Ec / 2);
-	$Ec = 2 * todeg(atan($Ec));				# true anomaly
-	$Lambdasun = fixangle($Ec + $Elongp);		# Sun's geocentric ecliptic
-												# longitude
+	$Ec = 2 * todeg(atan($Ec));					# true anomaly
+	$Lambdasun = fixangle($Ec + $Elongp);				# Sun's geocentric ecliptic
+									# longitude
 	# Orbital distance factor.
 	$F = ((1 + $Eccent * cos(torad($Ec))) / (1 - $Eccent * $Eccent));
 	$SunDist = $Sunsmax / $F;					# distance to Sun in km
@@ -459,11 +438,11 @@ __END__
 
 =head1 NAME
 
-MoonPhase - Information about the phase of the moon
+MoonPhase - Information about the phase of the Moon
 
 =head1 SYNOPSIS
 
-use MoonPhase;
+use Astro::MoonPhase;
 
 	( $MoonPhase,
 	  $MoonIllum,
@@ -472,7 +451,7 @@ use MoonPhase;
 	  $MoonAng,
 	  $SunDist,
 	  $SunAng ) = phase($seconds_since_1970);
-	
+
 	@phases  = phasehunt($seconds_since_1970);
 
 
@@ -553,7 +532,7 @@ Example:
      print "MoonDist   = $MoonDist\n";
      print "MoonAng    = $MoonAng\n";
      print "SunDist    = $SunDist\n";
-     print "SunAng     = $SunAng\n";>
+     print "SunAng     = $SunAng\n";
 
 could print something like this:
 
@@ -639,3 +618,9 @@ Perl transcription:
 
     Raino Pikkarainen, 1998
     raino.pikkarainen@saunalahti.fi
+
+
+Revision:
+
+    Brett Hamilton, 2003
+    http://simple.be/
