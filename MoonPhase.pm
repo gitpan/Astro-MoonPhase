@@ -7,7 +7,7 @@ require Exporter;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(phase phasehunt);
-$VERSION = '0.11';
+$VERSION = '0.51';
 
 use Time::Local qw(timegm);
 
@@ -88,100 +88,80 @@ sub jtime {
 }
 
 
+# jdaytosecs - convert Julian date to a UNIX epoch
+
+sub jdaytosecs {
+  my $jday = shift;
+  my $stamp;
+	
+  $stamp = ($jday - 2440587.5)*86400;   # (juliandate - jdate of unix epoch)*(seconds per julian day)
+  return($stamp);
+
+}
+
+
+
 # jyear - convert Julian date to year, month, day, which are
 # returned via integer pointers to integers
 sub jyear {
-	my $td = shift;
-	my ($yy, $mm, $dd) = @_;
-	my ($j, $d, $y, $m);
+
+	my ($td, $yy, $mm, $dd) = @_;
+	my ($z, $f, $a, $alpha, $b, $c, $d, $e);
 
 	$td += 0.5;				# astronomical to civil
-	$j = floor($td);
-	$j = $j - 1721119.0;
-	$y = floor(((4 * $j) - 1) / 146097.0);
-	$j = ($j * 4.0) - (1.0 + (146097.0 * $y));
-	$d = floor($j / 4.0);
-	$j = floor(((4.0 * $d) + 3.0) / 1461.0);
-	$d = ((4.0 * $d) + 3.0) - (1461.0 * $j);
-	$d = floor(($d + 4.0) / 4.0);
-	$m = floor(((5.0 * $d) - 3) / 153.0);
-	$d = (5.0 * $d) - (3.0 + (153.0 * $m));
-	$d = floor(($d + 5.0) / 5.0);
-	$y = (100.0 * $y) + $j;
-	if ($m < 10.0) {
-		$m = $m + 3;
+	$z = floor($td);
+	$f = $td - $z;
+
+	if ($z < 2299161.0) {
+		$a = $z;
+	} else {
+		$alpha = floor(($z - 1867216.25) / 36524.25);
+		$a = $z + 1 + $alpha - floor($alpha / 4);
 	}
-	else {
-		$m = $m - 9;
-		$y = $y + 1;
-	}
-	$$yy = int $y;
-	$$mm = int $m;
-	$$dd = int $d;
+
+
+	$b = $a + 1524;
+	$c = floor(($b - 122.1) / 365.25);
+	$d = floor(365.25 * $c);
+	$e = floor(($b - $d) / 30.6001);
+
+	$$dd = $b - $d - floor(30.6001 * $e) + $f;
+	$$mm = $e < 14 ? $e - 1 : $e - 13;
+	$$yy = $$mm > 2 ? $c - 4716 : $c - 4715;
+
 }
 
-# jhms - convert Julian time to hour, minutes, and seconds
-sub jhms {
-	my $j = shift;
-	my ($ij, $h, $m, $s);
-	
-	$j += 0.5;				# astronomical to civil
-	$ij = int (($j - floor($j)) * 86400.0);
+##  meanphase  --  Calculates  time  of  the mean new Moon for a given
+##                 base date.  This argument K to this function is the
+##                 precomputed synodic month index, given by:
+##
+##                        K = (year - 1900) * 12.3685
+##
+##                 where year is expressed as a year and fractional year.  
 
-	$h = int ($ij / 3600);
-	$m = int (($ij / 60) % 60);
-	$s = int ($ij % 60);
 
-	return (($h, $m, $s));
-}
-
-# jdaytosecs - convert Julian time to a time returned by time() function
-sub jdaytosecs {
-	my $jday = shift;
-	my @hms = jhms($jday);
-	my ($y, $m, $d);
-	jyear($jday, \$y, \$m, \$d);
-	return ( timegm($hms[2], $hms[1], $hms[0], $d, --$m, $y) );
-}
-
-# meanphase - calculates mean phase of the Moon for a given base date
-# and desired phase:
-# 		  0.0   New Moon
-# 		  0.25  First quarter
-#		  0.5   Full moon
-# 		  0.75  Last quarter
-# 		  Beware!!!  This routine returns meaningless
-# 		  results for any other phase arguments.  Don't
-# 		  attempt to generalise it without understanding
-# 		  that the motion of the moon is far more complicated
-# 		  that this calculation reveals.
 sub meanphase {
-	my ($sdate, $phase, $usek) = @_;
-	my ($yy, $mm, $dd);
-	my ($k, $t, $t2, $t3, $nt1);
+  my ($sdate, $k) = @_;
+  my ($t, $t2, $t3, $nt1);
 
-	jyear($sdate, \$yy, \$mm, \$dd);
+  ## Time in Julian centuries from 1900 January 0.5 
+  $t = ($sdate - 2415020.0) / 36525;                    
+  $t2 = $t * $t;                       ## Square for frequent use 
+  $t3 = $t2 * $t;                      ## Cube for frequent use 
 
-	$k = ($yy + (($mm - 1) * (1.0 / 12.0)) - 1900) * 12.3685;
+  $nt1 = 2415020.75933 + $Synmonth * $k
+         + 0.0001178 * $t2
+         - 0.000000155 * $t3
+         + 0.00033 * dsin(166.56 + 132.87 * $t - 0.009173 * $t2);
 
-	# Time in Julian centuries from 1900 January 0.5.
-	$t = ($sdate - 2415020.0) / 36525;
-	$t2 = $t * $t;						# square for frequent use
-	$t3 = $t2 * $t;						# cube for frequent use
-
-	$$usek = $k = floor($k) + $phase;
-	
-	$nt1 = 2415020.75933 + $Synmonth * $k
-	  + 0.0001178 * $t2
-	  - 0.000000155 * $t3
-	  + 0.00033 * dsin(166.56 + 132.87 * $t - 0.009173 * $t2);
-
-	return ($nt1);
+  return ($nt1);
 }
+
 
 # truephase - given a K value used to determine the mean phase of the
 # new moon, and a phase selector (0.0, 0.25, 0.5, 0.75),
 # obtain the true, corrected phase time
+
 sub truephase {
 	my ($k, $phase) = @_;
 	my ($t, $t2, $t3, $pt, $m, $mprime, $f);
@@ -271,24 +251,45 @@ sub truephase {
 # phasehunt - find time of phases of the moon which surround the current
 # date.  Five phases are found, starting and ending with the
 # new moons which bound the current lunation
-sub phasehunt {
-	my $sdate = jtime(shift || time());
-	my ($k1, $k2, $nt1, $nt2);
 
-	$nt1 = meanphase($sdate, 0.0, \$k1);
+sub phasehunt {                             
+        my $sdate = jtime(shift || time());
+        my ($adate, $k1, $k2, $nt1, $nt2); 
+        my ($yy, $mm, $dd); 
 
-	$k1++ if $nt1 < $sdate;
-	$k1-- if $nt1 > $sdate;
+        $adate = $sdate - 45;             
 
-	return  map { jdaytosecs(truephase( @$_ ) ) }
-			(
-			map( { [ $k1, $_ ]         } ( 0, 0.25, 0.5, 0.75 ) ),
-			map( { [ $k1 + 1, $_ ]     } ( 0 )                  )
-			);
+	jyear($adate, \$yy, \$mm, \$dd);
+	$k1 = floor(($yy + (($mm - 1) * (1.0 / 12.0)) - 1900) * 12.3685);
 
-}
+	$adate = $nt1 = meanphase($adate,  $k1);
+
+        while (1) {                         
+                $adate += $Synmonth;
+		$k2 = $k1 + 1;
+                $nt2 = meanphase($adate, $k2);
+                if (($nt1 <= $sdate) && ($nt2 > $sdate)) {
+                        last;                         
+                }            
+                $nt1 = $nt2;
+                $k1 = $k2;  
+
+        }                 
+
+
+         
+        return  (
+                        jdaytosecs(truephase($k1, 0.0)),
+                        jdaytosecs(truephase($k1, 0.25)),
+                        jdaytosecs(truephase($k1, 0.5)), 
+                        jdaytosecs(truephase($k1, 0.75)),
+                        jdaytosecs(truephase($k2, 0.0))  
+                        );                             
+}                         
+
 
 # kepler - solve the equation of Kepler
+
 sub kepler {
 	my ($m, $ecc) = @_;
 	my ($e, $delta);
@@ -303,6 +304,8 @@ sub kepler {
 	return ($e);
 }
 
+
+
 # phase - calculate phase of moon as a fraction:
 # 
 # The argument is the time for which the phase is requested,
@@ -313,6 +316,7 @@ sub kepler {
 # distance of the Moon from the centre of the Earth, and the
 # angular diameter subtended by the Moon as seen by an observer
 # at the centre of the Earth.
+
 sub phase {
 	my $pdate = jtime(shift || time());
 
@@ -607,20 +611,21 @@ whole of the law".
 
 =head1 AUTHORS
 
-the moontool.c:
-
+The moontool.c Release 2.0:
     A Moon for the Sun
-    Release 2.0
     Designed and implemented by John Walker in December 1987,
     revised and updated in February of 1988.
 
-Perl transcription:
-
+Initial Perl transcription:
     Raino Pikkarainen, 1998
     raino.pikkarainen@saunalahti.fi
 
+The moontool.c Release 2.4:
+    Major enhancements by Ron Hitchens, 1989
 
-Revision:
+Revisions:
+    Brett Hamilton  http://simple.be/
+    Bug fix, 2003
+    Second transcription and bugfixes, 2004
 
-    Brett Hamilton, 2003
-    http://simple.be/
+
