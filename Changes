@@ -25,3 +25,8 @@ Revision history for Perl extension Astro::MoonPhase.
 	  is now much simplified, and jhms() has been eliminated.
 
 
+0.52  Thu Oct  7 08:34:06 PDT 2004
+
+	- minor change to authors section
+
+

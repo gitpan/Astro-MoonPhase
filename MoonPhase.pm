@@ -7,7 +7,7 @@ require Exporter;
 
 @ISA = qw(Exporter);
 @EXPORT = qw(phase phasehunt);
-$VERSION = '0.51';
+$VERSION = '0.52';
 
 use Time::Local qw(timegm);
 
@@ -612,18 +612,22 @@ whole of the law".
 =head1 AUTHORS
 
 The moontool.c Release 2.0:
+
     A Moon for the Sun
     Designed and implemented by John Walker in December 1987,
     revised and updated in February of 1988.
 
 Initial Perl transcription:
+
     Raino Pikkarainen, 1998
     raino.pikkarainen@saunalahti.fi
 
 The moontool.c Release 2.4:
+
     Major enhancements by Ron Hitchens, 1989
 
 Revisions:
+
     Brett Hamilton  http://simple.be/
     Bug fix, 2003
     Second transcription and bugfixes, 2004
