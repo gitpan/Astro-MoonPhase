@@ -30,3 +30,8 @@ Revision history for Perl extension Astro::MoonPhase.
 	- minor change to authors section
 
 
+0.60  Wed Mar 21 10:15:45 CDT 2007
+
+	Contributions by Christopher J. Madsen:
+	- new function: phaselist
+        - real tests

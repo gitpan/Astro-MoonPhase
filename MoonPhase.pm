@@ -6,10 +6,8 @@ use vars qw($VERSION @ISA @EXPORT @EXPORT_OK);
 require Exporter;
 
 @ISA = qw(Exporter);
-@EXPORT = qw(phase phasehunt);
-$VERSION = '0.52';
-
-use Time::Local qw(timegm);
+@EXPORT = qw(phase phasehunt phaselist);
+$VERSION = '0.60';
 
 use vars qw (
 			$Epoch
@@ -93,7 +91,7 @@ sub jtime {
 sub jdaytosecs {
   my $jday = shift;
   my $stamp;
-	
+
   $stamp = ($jday - 2440587.5)*86400;   # (juliandate - jdate of unix epoch)*(seconds per julian day)
   return($stamp);
 
@@ -137,17 +135,17 @@ sub jyear {
 ##
 ##                        K = (year - 1900) * 12.3685
 ##
-##                 where year is expressed as a year and fractional year.  
+##                 where year is expressed as a year and fractional year.
 
 
 sub meanphase {
   my ($sdate, $k) = @_;
   my ($t, $t2, $t3, $nt1);
 
-  ## Time in Julian centuries from 1900 January 0.5 
-  $t = ($sdate - 2415020.0) / 36525;                    
-  $t2 = $t * $t;                       ## Square for frequent use 
-  $t3 = $t2 * $t;                      ## Cube for frequent use 
+  ## Time in Julian centuries from 1900 January 0.5
+  $t = ($sdate - 2415020.0) / 36525;
+  $t2 = $t * $t;                       ## Square for frequent use
+  $t3 = $t2 * $t;                      ## Cube for frequent use
 
   $nt1 = 2415020.75933 + $Synmonth * $k
          + 0.0001178 * $t2
@@ -179,7 +177,7 @@ sub truephase {
 	 + 0.0001178 * $t2
 	 - 0.000000155 * $t3
 	 + 0.00033 * dsin(166.56 + 132.87 * $t - 0.009173 * $t2);
-	
+
 	# Sun's mean anomaly
 	$m = 359.2242
 	+ 29.10535608 * $k
@@ -252,40 +250,70 @@ sub truephase {
 # date.  Five phases are found, starting and ending with the
 # new moons which bound the current lunation
 
-sub phasehunt {                             
+sub phasehunt {
         my $sdate = jtime(shift || time());
-        my ($adate, $k1, $k2, $nt1, $nt2); 
-        my ($yy, $mm, $dd); 
+        my ($adate, $k1, $k2, $nt1, $nt2);
+        my ($yy, $mm, $dd);
 
-        $adate = $sdate - 45;             
+        $adate = $sdate - 45;
 
 	jyear($adate, \$yy, \$mm, \$dd);
 	$k1 = floor(($yy + (($mm - 1) * (1.0 / 12.0)) - 1900) * 12.3685);
 
 	$adate = $nt1 = meanphase($adate,  $k1);
 
-        while (1) {                         
+        while (1) {
                 $adate += $Synmonth;
 		$k2 = $k1 + 1;
                 $nt2 = meanphase($adate, $k2);
                 if (($nt1 <= $sdate) && ($nt2 > $sdate)) {
-                        last;                         
-                }            
+                        last;
+                }
                 $nt1 = $nt2;
-                $k1 = $k2;  
+                $k1 = $k2;
 
-        }                 
+        }
 
 
-         
+
         return  (
                         jdaytosecs(truephase($k1, 0.0)),
                         jdaytosecs(truephase($k1, 0.25)),
-                        jdaytosecs(truephase($k1, 0.5)), 
+                        jdaytosecs(truephase($k1, 0.5)),
                         jdaytosecs(truephase($k1, 0.75)),
-                        jdaytosecs(truephase($k2, 0.0))  
-                        );                             
-}                         
+                        jdaytosecs(truephase($k2, 0.0))
+                        );
+}
+
+
+
+# phaselist - find time of phases of the moon between two dates
+# times (in & out) are seconds_since_1970
+
+sub phaselist
+{
+  my ($sdate, $edate) = map { jtime($_) } @_;
+
+  my (@phases, $d, $k, $yy, $mm);
+
+  jyear($sdate, \$yy, \$mm, \$d);
+  $k = floor(($yy + (($mm - 1) * (1.0 / 12.0)) - 1900) * 12.3685) - 2;
+
+  while (1) {
+    ++$k;
+    for my $phase (0.0, 0.25, 0.5, 0.75) {
+      $d = truephase($k, $phase);
+
+      return @phases if $d >= $edate;
+
+      if ($d >= $sdate) {
+        push @phases, int(4 * $phase) unless @phases;
+        push @phases, jdaytosecs($d);
+      } # end if date should be listed
+    } # end for each $phase
+  } # end while 1
+} # end phaselist
+
 
 
 # kepler - solve the equation of Kepler
@@ -307,7 +335,7 @@ sub kepler {
 
 
 # phase - calculate phase of moon as a fraction:
-# 
+#
 # The argument is the time for which the phase is requested,
 # expressed as a Julian date and fraction.  Returns the terminator
 # phase angle as a percentage of a full circle (i.e., 0 to 1),
@@ -442,7 +470,7 @@ __END__
 
 =head1 NAME
 
-MoonPhase - Information about the phase of the Moon
+Astro::MoonPhase - Information about the phase of the Moon
 
 =head1 SYNOPSIS
 
@@ -458,6 +486,7 @@ use Astro::MoonPhase;
 
 	@phases  = phasehunt($seconds_since_1970);
 
+	($phase, @times) = phaselist($start, $stop);
 
 =head1 DESCRIPTION
 
@@ -577,6 +606,40 @@ could print something like this:
     Last quarter  = Thu Jul 16 18:15:18 1998
     New Moon      = Thu Jul 23 16:45:01 1998
 
+=head2 phaselist()
+
+    ($phase, @times) = phaselist($start, $stop);
+
+Finds times of all phases of the moon which occur on or after
+C<$start> but before C<$stop>.  Both the arguments and the return
+values are expressed as seconds since 1970 (like the C<time> function
+returns).
+
+C<$phase> is an integer indicating the phase of the moon at
+C<$times[0]>, as shown in this table:
+
+    0  New Moon
+    1  First quarter
+    2  Full Moon
+    3  Last quarter
+
+The remaining values in C<@times> indicate subsequent phases of the
+moon (in ascending order by time).  If there are no phases of the moon
+between C<$start> and C<$stop>, C<phaselist> returns the empty list.
+
+Example:
+
+    @name = ("New Moon", "First quarter", "Full moon", "Last quarter");
+    ($phase, @times) = phaselist($start, $stop);
+
+    while (@times) {
+      printf "%-14s= %s\n", $name[$phase], scalar localtime shift @times;
+      $phase = ($phase + 1) % 4;
+    }
+
+could produce the same output as the C<phasehunt> example above (given
+the appropriate start & stop times).
+
 =head1 ABOUT THE ALGORITHMS
 
 The algorithms used in this program to calculate the positions of Sun and
@@ -632,4 +695,5 @@ Revisions:
     Bug fix, 2003
     Second transcription and bugfixes, 2004
 
-
+    Christopher J. Madsen  http://www.cjmweb.net/
+    Added phaselist function, March 2007

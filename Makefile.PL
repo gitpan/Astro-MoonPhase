@@ -4,4 +4,6 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     'NAME'	=> 'Astro::MoonPhase',
     'VERSION_FROM' => 'MoonPhase.pm', # finds $VERSION
+    'ABSTRACT_FROM'=> 'MoonPhase.pm',
+    'LICENSE'      => 'unrestricted',
 );
