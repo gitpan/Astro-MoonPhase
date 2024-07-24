@@ -171,7 +171,7 @@ sub truephase {
 	$t2 = $t * $t;				# square for frequent use
 	$t3 = $t2 * $t;				# cube for frequent use
 
-	# mean time of phase */
+	# mean time of phase
 	$pt = 2415020.75933
 	 + $Synmonth * $k
 	 + 0.0001178 * $t2
